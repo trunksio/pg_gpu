@@ -1,5 +1,5 @@
 # vim:set ft=dockerfile:
-FROM ubuntu:16.04 
+FROM nvidia/cuda 
 
 RUN set -ex; \
 	if ! command -v gpg > /dev/null; then \
@@ -17,7 +17,7 @@ RUN groupadd -r postgres --gid=999 && useradd -r -g postgres --uid=999 postgres
 # grab gosu for easy step-down from root
 ENV GOSU_VERSION 1.10
 RUN set -x \
-	&& apt-get update && apt-get install -y --no-install-recommends ca-certificates wget && rm -rf /var/lib/apt/lists/* \
+	&& apt-get update && apt-get install -y --no-install-recommends mesa-utils git  gcc  bison  flex make ca-certificates wget && rm -rf /var/lib/apt/lists/* \
 	&& wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$(dpkg --print-architecture)" \
 	&& wget -O /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$(dpkg --print-architecture).asc" \
 	&& export GNUPGHOME="$(mktemp -d)" \
@@ -25,8 +25,7 @@ RUN set -x \
 	&& gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu \
 	&& rm -rf "$GNUPGHOME" /usr/local/bin/gosu.asc \
 	&& chmod +x /usr/local/bin/gosu \
-	&& gosu nobody true \
-	&& apt-get purge -y --auto-remove ca-certificates wget
+	&& gosu nobody true 
 
 # make the "en_US.UTF-8" locale so postgres will be utf-8 enabled by default
 RUN apt-get update && apt-get install -y locales && rm -rf /var/lib/apt/lists/* \
@@ -99,7 +98,7 @@ RUN set -ex; \
 			;; \
 	esac; \
 	\
-	apt-get install -y postgresql-common; \
+	apt-get install -y postgresql-server-dev-9.6 postgresql-common; \
 	sed -ri 's/#(create_main_cluster) .*$/\1 = false/' /etc/postgresql-common/createcluster.conf; \
 	apt-get install -y \
 		"postgresql-$PG_MAJOR=$PG_VERSION" \
@@ -120,7 +119,15 @@ RUN mv -v "/usr/share/postgresql/$PG_MAJOR/postgresql.conf.sample" /usr/share/po
 	&& sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" /usr/share/postgresql/postgresql.conf.sample
 
 RUN mkdir -p /var/run/postgresql && chown -R postgres:postgres /var/run/postgresql && chmod 2777 /var/run/postgresql
-
+LABEL com.nvidia.volumes.needed="nvidia_driver"
+ENV PATH /usr/local/nvidia/bin:${PATH}
+ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
+RUN  pg_config --pgxs
+#RUN git clone https://github.com/pg-strom/devel.git pg_strom
+RUN git clone https://github.com/heterodb/pg-strom.git pg_strom
+WORKDIR pg_strom
+RUN make; make install
+WORKDIR /
 ENV PATH $PATH:/usr/lib/postgresql/$PG_MAJOR/bin
 ENV PGDATA /var/lib/postgresql/data
 RUN mkdir -p "$PGDATA" && chown -R postgres:postgres "$PGDATA" && chmod 777 "$PGDATA" # this 777 will be replaced by 700 at runtime (allows semi-arbitrary "--user" values)
