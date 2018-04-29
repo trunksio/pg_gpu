@@ -1,5 +1,5 @@
 # vim:set ft=dockerfile:
-FROM nvidia/cuda 
+FROM nvidia/cuda:9.1-devel 
 
 RUN set -ex; \
 	if ! command -v gpg > /dev/null; then \
