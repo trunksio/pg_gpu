@@ -46,7 +46,7 @@ RUN set -ex; \
 	apt-key list
 
 ENV PG_MAJOR 9.6
-ENV PG_VERSION 9.6.8-1.pgdg80+1
+ENV PG_VERSION 9.6.9-2.pgdg80+1
 
 RUN set -ex; \
 	\
@@ -136,6 +136,7 @@ VOLUME /var/lib/postgresql/data
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN ln -s usr/local/bin/docker-entrypoint.sh / # backwards compat
 ENTRYPOINT ["docker-entrypoint.sh"]
-
+COPY postgresql.conf /usr/share/postgresql/postgresql.conf.sample 
+RUN chmod 755 /usr/share/postgresql/postgresql.conf.sample
 EXPOSE 5432
 CMD ["postgres"]
